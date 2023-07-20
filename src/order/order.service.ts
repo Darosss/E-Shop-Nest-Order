@@ -4,12 +4,7 @@ import { ClientGrpc } from '@nestjs/microservices';
 import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { Order } from './entities/order.entity';
-import {
-  FindOneResponse,
-  DecreaseStockResponse,
-  ProductServiceClient,
-  PRODUCT_SERVICE_NAME,
-} from './pb/product.pb';
+import { ProductServiceClient, PRODUCT_SERVICE_NAME } from './pb/product.pb';
 import { CreateOrderRequest, CreateOrderResponse } from './pb/order.pb';
 
 @Injectable()
@@ -30,43 +25,68 @@ export class OrderService implements OnModuleInit {
   public async createOrder(
     data: CreateOrderRequest,
   ): Promise<CreateOrderResponse> {
-    const product: FindOneResponse = await firstValueFrom(
-      this.productSvc.findOne({ id: data.productId }),
-    );
+    const { userId, shippingAddres, paymentMethod, productIdToQuantity } = data;
 
-    if (product.status >= HttpStatus.NOT_FOUND) {
-      return { id: null, error: ['Product not found'], status: product.status };
-    } else if (product.data.stock < data.quantity) {
+    const { status: availabilityStatus, error: availabilityError } =
+      await firstValueFrom(
+        this.productSvc.checkProductsQuantityAvailability({
+          products: productIdToQuantity,
+        }),
+      );
+
+    if (availabilityStatus !== 200 && availabilityError !== null) {
       return {
         id: null,
-        error: ['Stock too less'],
-        status: HttpStatus.CONFLICT,
+        error: availabilityError,
+        status: availabilityStatus,
       };
     }
 
+    const {
+      data: sumPriceData,
+      status: sumPriceStatus,
+      error: sumPriceError,
+    } = await firstValueFrom(
+      this.productSvc.sumProductsPrice({ products: productIdToQuantity }),
+    );
+
+    if (sumPriceStatus !== 200 && sumPriceError !== null) {
+      return {
+        id: null,
+        error: sumPriceError,
+        status: sumPriceStatus,
+      };
+    }
     const order: Order = new Order();
 
-    order.price = product.data.price;
-    order.productId = product.data.id;
-    order.userId = data.userId;
+    order.price = sumPriceData.price;
+    order.productsIds = Object.keys(productIdToQuantity).map((key) =>
+      parseInt(key, 10),
+    );
+    order.userId = userId;
+    order.status = 'pending';
+    order.shippingAddres = shippingAddres;
+    order.paymentMethod = paymentMethod;
 
     await this.repository.save(order);
 
-    const decreasedStockData: DecreaseStockResponse = await firstValueFrom(
-      this.productSvc.decreaseStock({
-        id: data.productId,
-        orderId: order.id,
-        quantity: data.quantity,
-      }),
-    );
+    const { status: decreasedStockStatus, error: decreasedStockError } =
+      await firstValueFrom(
+        this.productSvc.decreaseMultipleStockProducts({
+          products: productIdToQuantity,
+          userId: userId,
+          reason: 'order',
+          orderId: order.id,
+        }),
+      );
 
-    if (decreasedStockData.status === HttpStatus.CONFLICT) {
+    if (decreasedStockStatus === HttpStatus.CONFLICT) {
       await this.repository.delete(order.id);
 
       return {
         id: null,
-        error: decreasedStockData.error,
-        status: HttpStatus.CONFLICT,
+        error: decreasedStockError,
+        status: decreasedStockStatus,
       };
     }
 

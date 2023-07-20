@@ -1,14 +1,25 @@
-import { IsNumber, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsObject, IsString, Min } from 'class-validator';
 import { CreateOrderRequest } from '../pb/order.pb';
+import { IsPositiveValues } from './validator.helper';
 
 export class CreateOrderRequestDto implements CreateOrderRequest {
+  @IsNotEmpty()
   @IsNumber()
-  public productId: number;
-
-  @IsNumber()
-  @Min(1)
-  public quantity: number;
-
-  @IsNumber()
+  @Min(0)
   public userId: number;
+
+  //TODO: add validation for these:
+  @IsObject({
+    message: 'productIdToQuantity must be an object of {id: quantity}',
+  })
+  @IsPositiveValues()
+  public productIdToQuantity: { [key: number]: number };
+
+  @IsString()
+  @IsNotEmpty()
+  public shippingAddres: string;
+
+  @IsString()
+  @IsNotEmpty()
+  public paymentMethod: string;
 }

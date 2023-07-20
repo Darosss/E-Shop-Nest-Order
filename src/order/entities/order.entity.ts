@@ -1,4 +1,11 @@
-import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BaseEntity,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity()
 export class Order extends BaseEntity {
@@ -12,9 +19,27 @@ export class Order extends BaseEntity {
    * Relation IDs
    */
 
-  @Column({ type: 'integer' })
-  public productId!: number;
+  @Column({ type: 'integer', array: true })
+  public productsIds!: number[];
 
   @Column({ type: 'integer' })
   public userId!: number;
+
+  //TODO: make an enum?
+  @Column({ type: 'varchar', default: 'pending' })
+  public status!: string;
+
+  //TODO: make an enum?
+  @Column({ type: 'varchar' })
+  public shippingAddres!: string;
+
+  //TODO: make an enum?
+  @Column({ type: 'varchar' })
+  public paymentMethod!: string;
+
+  @CreateDateColumn()
+  public createdAt!: Date;
+
+  @UpdateDateColumn()
+  public updatedAt!: Date;
 }
