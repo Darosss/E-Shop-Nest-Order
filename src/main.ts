@@ -5,6 +5,7 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { protobufPackage } from './order/pb/order.pb';
 import { status } from '@grpc/grpc-js';
+import { ORDER_MICROSERVICE_URL } from './configs';
 
 async function bootstrap() {
   const app: INestMicroservice = await NestFactory.createMicroservice(
@@ -12,7 +13,7 @@ async function bootstrap() {
     {
       transport: Transport.GRPC,
       options: {
-        url: '0.0.0.0:50052',
+        url: ORDER_MICROSERVICE_URL,
         package: protobufPackage,
         protoPath: join('node_modules/e-shop-nest-proto/proto/order.proto'),
       },
